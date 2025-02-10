@@ -98,7 +98,7 @@ export class Trubrics {
      *      properties: {
      *          page: "Home page"
      *      },
-     *      latency: 1000, // The latency in milliseconds between the prompt and the generation
+     *      latency: 1, // The latency in seconds between the prompt and the generation
      *  });
      * ```
      */
@@ -112,7 +112,7 @@ export class Trubrics {
             validateRequest([request.user_id, request.prompt, request.assistant_id, request.generation], [request.latency], [request.timestamp], [request.user_id, request.prompt, request.assistant_id, request.generation]);
             request.timestamp = request.timestamp ?? new Date();
 
-            const promptTimestamp = new Date(request.timestamp.getTime() - (request.latency ?? 1));
+            const promptTimestamp = new Date(request.timestamp.getTime() - (request.latency ?? 1) * 1000);
 
             this.track({
                 event: "Prompt",
@@ -130,7 +130,7 @@ export class Trubrics {
                 properties: {
                     $text: request.generation,
                     $prompt: request.prompt,
-                    latency: request.latency,
+                    "latency(s)": request.latency,
                     ...request.properties
                 },
                 timestamp: request.timestamp
