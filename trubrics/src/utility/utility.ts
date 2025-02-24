@@ -1,4 +1,4 @@
-import { EventToPublish, TrackLLMRequest, TrackRequest, TrubricsEventTypes, TrubricsIngestionEndpoints } from "../../types/types.js";
+import { EventToPublish, TrackLLMRequest, TrackRequest, TrubricsEventTypes, TrubricsIngestionEndpoints } from "../types.js";
 
 export const validateResponse = (response: Response) => {
     if (!response.ok) {
