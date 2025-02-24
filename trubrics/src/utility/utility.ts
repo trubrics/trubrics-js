@@ -1,4 +1,4 @@
-import { EventToPublish, TrackLLMRequest, TrackRequest, TrubricsEventTypes, TrubricsIngestionEndpoints } from "../../types/types.js";
+import { EventToPublish, TrackLLMRequest, TrackRequest } from "../../types/types.js";
 
 export const validateResponse = (response: Response) => {
     if (!response.ok) {
@@ -90,6 +90,10 @@ const batchEvents = async (
     endpoint: TrubricsIngestionEndpoints,
     eventType: TrubricsEventTypes
 ) => {
+    if (!events.length) {
+        return true;
+    }
+
     if (isVerbose) {
         console.info(`Posting ${events.length} ${eventType}s`);
     }
@@ -106,4 +110,14 @@ const batchEvents = async (
         console.error(`Trubrics was unable to post ${events.length} ${eventType}s.`, error);
         return false;
     }
+}
+
+export enum TrubricsEventTypes {
+    EVENT = "event",
+    LLM_EVENT = "llm_event"
+}
+
+export enum TrubricsIngestionEndpoints {
+    EVENT = "publish_events",
+    LLM_EVENT = "publish_llm_events"
 }

@@ -1,5 +1,5 @@
-import { EventToPublish, TrackLLMRequest, TrackRequest, TrubricsEventTypes, TrubricsInitialization } from '../types/types.js';
-import { flushQueue, checkAuth, validateRequest } from './utility/utility.js';
+import { EventToPublish, TrackLLMRequest, TrackRequest, TrubricsInitialization } from '../types/types.js';
+import { flushQueue, checkAuth, validateRequest, TrubricsEventTypes } from './utility/utility.js';
 
 /**
  * The TrubricsClientTracker enables the tracking of client side events through the Trubrics API.

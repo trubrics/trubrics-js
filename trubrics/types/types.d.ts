@@ -27,13 +27,3 @@ export type TrubricsInitialization = {
     flushAt?: number,
     isVerbose?: boolean
 }
-
-export enum TrubricsEventTypes {
-    EVENT = "event",
-    LLM_EVENT = "llm_event"
-}
-
-export enum TrubricsIngestionEndpoints {
-    EVENT = "publish_events",
-    LLM_EVENT = "publish_llm_events"
-}
