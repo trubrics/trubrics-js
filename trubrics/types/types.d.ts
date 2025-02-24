@@ -15,10 +15,25 @@ export type TrackLLMRequest = {
     latency?: number
 }
 
+export type EventToPublish = {
+    event: TrackRequest | TrackLLMRequest,
+    eventType: TrubricsEventTypes
+}
+
 export type TrubricsInitialization = {
     apiKey: string,
     host?: string,
     flushInterval?: number,
     flushAt?: number,
     isVerbose?: boolean
+}
+
+export enum TrubricsEventTypes {
+    EVENT = "event",
+    LLM_EVENT = "llm_event"
+}
+
+export enum TrubricsIngestionEndpoints {
+    EVENT = "publish_events",
+    LLM_EVENT = "publish_llm_events"
 }

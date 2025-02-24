@@ -1,4 +1,4 @@
-import { TrackLLMRequest, TrackRequest, TrubricsInitialization } from '../types/types.js'
+import { EventToPublish, TrackLLMRequest, TrackRequest, TrubricsEventTypes, TrubricsInitialization } from '../types/types.js'
 import { flushQueue, checkAuth, validateRequest } from './utility/utility.js';
 
 /**
@@ -14,7 +14,7 @@ import { flushQueue, checkAuth, validateRequest } from './utility/utility.js';
 export class Trubrics {
     private apiKey = "";
     private host = "https://app.trubrics.com/api/ingestion";
-    private queue: TrackRequest[] = [];
+    private queue: EventToPublish[] = [];
     private isVerbose = false;
     private flushInterval: number;
     private flushAt: number;
@@ -78,8 +78,11 @@ export class Trubrics {
             checkAuth(this.apiKey);
             validateRequest([request.event, request.user_id], [], [request.timestamp], [request.event, request.user_id]);
             request.timestamp = request.timestamp ?? new Date();
-
-            this.queue.push(request);
+            
+            this.queue.push({
+                event: request,
+                eventType: TrubricsEventTypes.EVENT
+            });
         } catch (error) {
             console.error("Trubrics was unable to track the latest events.", error);
         }
@@ -112,28 +115,9 @@ export class Trubrics {
             validateRequest([request.user_id, request.prompt, request.assistant_id, request.generation], [request.latency], [request.timestamp], [request.user_id, request.prompt, request.assistant_id, request.generation]);
             request.timestamp = request.timestamp ?? new Date();
 
-            const promptTimestamp = new Date(request.timestamp.getTime() - (request.latency ?? 1));
-
-            this.track({
-                event: "Prompt",
-                user_id: request.user_id,
-                properties: {
-                    $text: request.prompt,
-                    ...request.properties
-                },
-                timestamp: promptTimestamp
-            });
-
-            this.track({
-                event: "Generation",
-                user_id: request.user_id,
-                properties: {
-                    $text: request.generation,
-                    $prompt: request.prompt,
-                    latency: request.latency,
-                    ...request.properties
-                },
-                timestamp: request.timestamp
+            this.queue.push({
+                event: request,
+                eventType: TrubricsEventTypes.LLM_EVENT
             });
         } catch (error) {
             console.error("Trubrics was unable to track the latest LLM event.", error);

@@ -1,4 +1,4 @@
-import { TrackRequest } from "../../types/types.js";
+import { EventToPublish, TrackLLMRequest, TrackRequest, TrubricsEventTypes, TrubricsIngestionEndpoints } from "../../types/types.js";
 
 export const validateResponse = (response: Response) => {
     if (!response.ok) {
@@ -43,32 +43,59 @@ export const checkAuth = (apiKey: string) => {
     }
 }
 
-export const flushQueue = async (queue: TrackRequest[], host: string, apiKey: string, isVerbose: boolean) => {
+export const flushQueue = async (queue: EventToPublish[], host: string, apiKey: string, isVerbose: boolean) => {
+    const events: TrackRequest[] = [];
+    const llmEvents: TrackLLMRequest[] = [];
+
     const queueCount = queue.length;
     if (queueCount === 0) {
         return;
     }
 
-    const events = queue.slice(0, queueCount)
-    const success = await batchEvents(events, host, apiKey, isVerbose);
+    const eventsToPublish = queue.slice(0, queueCount)
 
-    if (!success) {
+    for (const event of eventsToPublish) {
+        if (event.eventType === TrubricsEventTypes.EVENT) {
+            events.push(event.event as TrackRequest);
+        } else if (event.eventType === TrubricsEventTypes.LLM_EVENT) {
+            llmEvents.push(event.event as TrackLLMRequest);
+        }
+    }
+
+    const eventsSuccess = await batchEvents(events, host, apiKey, isVerbose, TrubricsIngestionEndpoints.EVENT, TrubricsEventTypes.EVENT);
+    const llmEventsSuccess = await batchEvents(llmEvents, host, apiKey, isVerbose, TrubricsIngestionEndpoints.LLM_EVENT, TrubricsEventTypes.LLM_EVENT);
+
+    if (!eventsSuccess) {
         await new Promise(resolve => setTimeout(resolve, 5000));
         if (isVerbose) {
             console.info(`Retrying to post ${queueCount} events`);
         }
-        await batchEvents(events, host, apiKey, isVerbose);
+        await batchEvents(events, host, apiKey, isVerbose, TrubricsIngestionEndpoints.EVENT, TrubricsEventTypes.EVENT);
+    }
+
+    if (!llmEventsSuccess) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        if (isVerbose) {
+            console.info(`Retrying to post ${queueCount} events`);
+        }
+        await batchEvents(llmEvents, host, apiKey, isVerbose, TrubricsIngestionEndpoints.LLM_EVENT, TrubricsEventTypes.LLM_EVENT);
     }
     queue.splice(0, queueCount);
 }
 
-const batchEvents = async (events: TrackRequest[], host: string, apiKey: string, isVerbose: boolean) => {
+const batchEvents = async (
+    events: (TrackRequest | TrackLLMRequest)[],
+    host: string, apiKey: string,
+    isVerbose: boolean,
+    endpoint: TrubricsIngestionEndpoints,
+    eventType: TrubricsEventTypes
+) => {
     if (isVerbose) {
-        console.info(`Posting ${events.length} events`);
+        console.info(`Posting ${events.length} ${eventType}s`);
     }
 
     try {
-        const url = new URL(host + "/publish_events");
+        const url = new URL(`${host}/${endpoint}`);
         const response = await fetch(url, {
             method: "POST",
             body: JSON.stringify(events),
@@ -76,7 +103,7 @@ const batchEvents = async (events: TrackRequest[], host: string, apiKey: string,
         });
         return validateResponse(response);
     } catch (error) {
-        console.error(`Trubrics was unable to post ${events.length} events.`, error);
+        console.error(`Trubrics was unable to post ${events.length} ${eventType}s.`, error);
         return false;
     }
 }
