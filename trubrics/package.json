@@ -23,7 +23,8 @@
     "typescript": "^5.5.4"
   },
   "files": [
-    "dist"
+    "dist",
+    "types"
   ],
   "exports": {
     ".": "./dist/trubrics.js"

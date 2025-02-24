@@ -3,6 +3,7 @@
     "target": "ES2022",
     "module": "NodeNext",
     "declaration": true,
+    "typeRoots": ["./node_modules/@types", "./types"],
     "outDir": "dist",
     "rootDir": "src",
     "esModuleInterop": true,
@@ -13,5 +14,5 @@
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "NodeNext"
   },
-  "include": ["src/**/*.ts", "src/types.d.ts"]
+  "include": ["src/*.ts"]
 }

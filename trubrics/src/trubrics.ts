@@ -1,4 +1,4 @@
-import { EventToPublish, TrackLLMRequest, TrackRequest, TrubricsEventTypes, TrubricsInitialization } from './types.js'
+import { EventToPublish, TrackLLMRequest, TrackRequest, TrubricsEventTypes, TrubricsInitialization } from '../types/types.js';
 import { flushQueue, checkAuth, validateRequest } from './utility/utility.js';
 
 /**
