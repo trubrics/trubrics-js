@@ -1,4 +1,5 @@
 import { EventToPublish, TrackLLMRequest, TrackRequest } from "../../types/types.js";
+import { MAX_FLUSH_BATCH_SIZE } from "./config.js";
 
 export const validateResponse = (response: Response) => {
     if (!response.ok) {
@@ -52,7 +53,8 @@ export const flushQueue = async (queue: EventToPublish[], host: string, apiKey: 
         return;
     }
 
-    const eventsToPublish = queue.slice(0, queueCount)
+    const numberOfEventsToPublish = queueCount < MAX_FLUSH_BATCH_SIZE ? queueCount : MAX_FLUSH_BATCH_SIZE;
+    const eventsToPublish = queue.slice(0, numberOfEventsToPublish)
 
     for (const event of eventsToPublish) {
         if (event.eventType === TrubricsEventTypes.EVENT) {
@@ -66,26 +68,34 @@ export const flushQueue = async (queue: EventToPublish[], host: string, apiKey: 
     const llmEventsSuccess = await batchEvents(llmEvents, host, apiKey, isVerbose, TrubricsIngestionEndpoints.LLM_EVENT, TrubricsEventTypes.LLM_EVENT);
 
     if (!eventsSuccess) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        if (isVerbose) {
-            console.info(`Retrying to post ${queueCount} events`);
-        }
-        await batchEvents(events, host, apiKey, isVerbose, TrubricsIngestionEndpoints.EVENT, TrubricsEventTypes.EVENT);
+        await retryBatch(events, host, apiKey, isVerbose, TrubricsIngestionEndpoints.EVENT, TrubricsEventTypes.EVENT);
     }
-
     if (!llmEventsSuccess) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        if (isVerbose) {
-            console.info(`Retrying to post ${queueCount} events`);
-        }
-        await batchEvents(llmEvents, host, apiKey, isVerbose, TrubricsIngestionEndpoints.LLM_EVENT, TrubricsEventTypes.LLM_EVENT);
+        await retryBatch(llmEvents, host, apiKey, isVerbose, TrubricsIngestionEndpoints.LLM_EVENT, TrubricsEventTypes.LLM_EVENT);
     }
-    queue.splice(0, queueCount);
+    
+    queue.splice(0, numberOfEventsToPublish);
+}
+
+const retryBatch = async (
+    events: (TrackRequest | TrackLLMRequest)[],
+    host: string,
+    apiKey: string,
+    isVerbose: boolean,
+    endpoint: TrubricsIngestionEndpoints,
+    eventType: TrubricsEventTypes
+) => {
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    if (isVerbose) {
+        console.info(`Retrying to post ${events.length} ${eventType}s`);
+    }
+    await batchEvents(events, host, apiKey, isVerbose, endpoint, eventType);
 }
 
 const batchEvents = async (
     events: (TrackRequest | TrackLLMRequest)[],
-    host: string, apiKey: string,
+    host: string,
+    apiKey: string,
     isVerbose: boolean,
     endpoint: TrubricsIngestionEndpoints,
     eventType: TrubricsEventTypes
