@@ -15,15 +15,15 @@ export type TrackLLMRequest = {
     latency?: number
 }
 
-export type EventToPublish = {
-    event: TrackRequest | TrackLLMRequest,
-    eventType: TrubricsEventTypes
-}
-
 export type TrubricsInitialization = {
     apiKey: string,
     host?: string,
     flushInterval?: number,
-    flushAt?: number,
+    flushBatchSize?: number,
     isVerbose?: boolean
+}
+
+export type EventToPublish = {
+    event: TrackRequest | TrackLLMRequest,
+    eventType: TrubricsEventTypes
 }
