@@ -28,7 +28,7 @@ export class Trubrics {
     private initFlushParameters = (trubricsInitialization: TrubricsInitialization) => {
         if (trubricsInitialization.flushInterval) {
             if (trubricsInitialization.flushInterval * 1000 < MIN_FLUSH_INTERVAL) {
-                throw new Error(`Flush interval cannot be less than ${MIN_FLUSH_INTERVAL} ms`);
+                throw new Error(`Flush interval cannot be less than ${MIN_FLUSH_INTERVAL / 1000} seconds`);
             } else {
                 this.flushInterval = trubricsInitialization.flushInterval * 1000;
             }
