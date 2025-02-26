@@ -1,42 +1,52 @@
-import { TrackLLMRequest, TrackRequest, TrubricsInitialization } from '../types/types.js'
+import { EventToPublish, TrackLLMRequest, TrackRequest, TrubricsInitialization } from '../types/types.js';
 import { flushQueue, checkAuth, validateRequest } from './utility/utility.js';
+import { DEFAULT_FLUSH_BATCH_SIZE, DEFAULT_FLUSH_INTERVAL, DEFAULT_FLUSH_PERIODIC_CHECK, MAX_FLUSH_BATCH_SIZE, MIN_FLUSH_INTERVAL, TrubricsEventTypes } from './utility/config.js';
 
 /**
- * The TrubricsClientTracker enables the tracking of client side events through the Trubrics API.
+ * The Trubrics SDK enables the tracking of events through the Trubrics API.
  *
- * @example
- * ```typescript
- * const trubrics = new Trubrics({
- *   apiKey: "YOUR_API_KEY",
- * });
- * ```
+ * @see {@link https://docs.trubrics.com/track_events/sdks/javascript/ | Trubrics Docs}
  */
 export class Trubrics {
     private apiKey = "";
     private host = "https://app.trubrics.com/api/ingestion";
-    private queue: TrackRequest[] = [];
+    private queue: EventToPublish[] = [];
     private isVerbose = false;
-    private flushInterval: number;
-    private flushAt: number;
-    private lastFlushTime: number;
-    private isFlushing: boolean;
+    private flushInterval: number = DEFAULT_FLUSH_INTERVAL;
+    private flushBatchSize: number = DEFAULT_FLUSH_BATCH_SIZE;
+    private lastFlushTime: number = Date.now();
+    private isFlushing: boolean = false;
 
     constructor(trubricsInitialization: TrubricsInitialization) {
         this.apiKey = trubricsInitialization.apiKey;
         this.host = trubricsInitialization.host ?? this.host;
         this.isVerbose = trubricsInitialization.isVerbose ?? false;
-        this.flushInterval = trubricsInitialization.flushInterval ?? 10000;
-        this.flushAt = trubricsInitialization.flushAt ?? 20;
-        this.lastFlushTime = Date.now();
-        this.isFlushing = false;
-        setInterval(() => this.periodicFlush(), 1000);
+        this.initFlushParameters(trubricsInitialization);
+        setInterval(() => this.periodicFlush(), DEFAULT_FLUSH_PERIODIC_CHECK);
+    }
+
+    private initFlushParameters = (trubricsInitialization: TrubricsInitialization) => {
+        if (trubricsInitialization.flushInterval) {
+            if (trubricsInitialization.flushInterval * 1000 < MIN_FLUSH_INTERVAL) {
+                throw new Error(`Flush interval cannot be less than ${MIN_FLUSH_INTERVAL / 1000} seconds`);
+            } else {
+                this.flushInterval = trubricsInitialization.flushInterval * 1000;
+            }
+        }
+        if (trubricsInitialization.flushBatchSize) {
+            if (trubricsInitialization.flushBatchSize && trubricsInitialization.flushBatchSize > MAX_FLUSH_BATCH_SIZE) {
+                throw new Error(`Flush batch size cannot be more than ${MAX_FLUSH_BATCH_SIZE} events`);
+            } else {
+                this.flushBatchSize = trubricsInitialization.flushBatchSize;
+            }
+        }
     }
 
     private async periodicFlush() {
         const now = Date.now();
         const timeSinceLastFlush = now - this.lastFlushTime;
 
-        if (this.queue.length >= this.flushAt || timeSinceLastFlush >= this.flushInterval) {
+        if (this.queue.length >= this.flushBatchSize || timeSinceLastFlush >= this.flushInterval) {
             await this.flush();
             this.lastFlushTime = Date.now();
         }
@@ -58,16 +68,7 @@ export class Trubrics {
     /**
      * This function is used to track events.
      *
-     * @example
-     * ```typescript
-     *  trubrics.track({
-     *      event: "Page Viewed",
-     *      properties: {
-     *          page: "Home page"
-     *      },
-     *      user_id: "your-username"
-     *  });
-     * ```
+     * @see {@link https://docs.trubrics.com/track_events/sdks/javascript/ | Trubrics Docs}
      */
     public track = (request: TrackRequest) => {
         if (this.isVerbose) {
@@ -79,7 +80,10 @@ export class Trubrics {
             validateRequest([request.event, request.user_id], [], [request.timestamp], [request.event, request.user_id]);
             request.timestamp = request.timestamp ?? new Date();
 
-            this.queue.push(request);
+            this.queue.push({
+                event: request,
+                eventType: TrubricsEventTypes.EVENT
+            });
         } catch (error) {
             console.error("Trubrics was unable to track the latest events.", error);
         }
@@ -88,19 +92,7 @@ export class Trubrics {
     /**
      * This function is used to track LLM events.
      *
-     * @example
-     * ```typescript
-     *  trubrics.track({
-     *      user_id: "your-username"
-     *      prompt: "Hello",
-     *      assistant_id: "your-assistant-id",
-     *      generation: "Hi",
-     *      properties: {
-     *          page: "Home page"
-     *      },
-     *      latency: 1000, // The latency in milliseconds between the prompt and the generation
-     *  });
-     * ```
+     * @see {@link https://docs.trubrics.com/track_events/sdks/javascript/ | Trubrics Docs}
      */
     public trackLLM = (request: TrackLLMRequest) => {
         if (this.isVerbose) {
@@ -112,28 +104,9 @@ export class Trubrics {
             validateRequest([request.user_id, request.prompt, request.assistant_id, request.generation], [request.latency], [request.timestamp], [request.user_id, request.prompt, request.assistant_id, request.generation]);
             request.timestamp = request.timestamp ?? new Date();
 
-            const promptTimestamp = new Date(request.timestamp.getTime() - (request.latency ?? 1));
-
-            this.track({
-                event: "Prompt",
-                user_id: request.user_id,
-                properties: {
-                    $text: request.prompt,
-                    ...request.properties
-                },
-                timestamp: promptTimestamp
-            });
-
-            this.track({
-                event: "Generation",
-                user_id: request.user_id,
-                properties: {
-                    $text: request.generation,
-                    $prompt: request.prompt,
-                    latency: request.latency,
-                    ...request.properties
-                },
-                timestamp: request.timestamp
+            this.queue.push({
+                event: request,
+                eventType: TrubricsEventTypes.LLM_EVENT
             });
         } catch (error) {
             console.error("Trubrics was unable to track the latest LLM event.", error);

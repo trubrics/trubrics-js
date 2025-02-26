@@ -1,6 +1,6 @@
 {
   "name": "@trubrics/trubrics",
-  "version": "0.5.21",
+  "version": "0.5.23",
   "main": "dist/trubrics.js",
   "type": "module",
   "scripts": {

@@ -1,4 +1,5 @@
-import { TrackRequest } from "../../types/types.js";
+import { EventToPublish, TrackLLMRequest, TrackRequest } from "../../types/types.js";
+import { MAX_FLUSH_BATCH_SIZE } from "./config.js";
 
 export const validateResponse = (response: Response) => {
     if (!response.ok) {
@@ -43,32 +44,72 @@ export const checkAuth = (apiKey: string) => {
     }
 }
 
-export const flushQueue = async (queue: TrackRequest[], host: string, apiKey: string, isVerbose: boolean) => {
+export const flushQueue = async (queue: EventToPublish[], host: string, apiKey: string, isVerbose: boolean) => {
+    const events: TrackRequest[] = [];
+    const llmEvents: TrackLLMRequest[] = [];
+
     const queueCount = queue.length;
     if (queueCount === 0) {
         return;
     }
 
-    const events = queue.slice(0, queueCount)
-    const success = await batchEvents(events, host, apiKey, isVerbose);
+    const numberOfEventsToPublish = queueCount < MAX_FLUSH_BATCH_SIZE ? queueCount : MAX_FLUSH_BATCH_SIZE;
+    const eventsToPublish = queue.slice(0, numberOfEventsToPublish)
 
-    if (!success) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        if (isVerbose) {
-            console.info(`Retrying to post ${queueCount} events`);
+    for (const event of eventsToPublish) {
+        if (event.eventType === TrubricsEventTypes.EVENT) {
+            events.push(event.event as TrackRequest);
+        } else if (event.eventType === TrubricsEventTypes.LLM_EVENT) {
+            llmEvents.push(event.event as TrackLLMRequest);
         }
-        await batchEvents(events, host, apiKey, isVerbose);
     }
-    queue.splice(0, queueCount);
+
+    const eventsSuccess = await batchEvents(events, host, apiKey, isVerbose, TrubricsIngestionEndpoints.EVENT, TrubricsEventTypes.EVENT);
+    const llmEventsSuccess = await batchEvents(llmEvents, host, apiKey, isVerbose, TrubricsIngestionEndpoints.LLM_EVENT, TrubricsEventTypes.LLM_EVENT);
+
+    if (!eventsSuccess) {
+        await retryBatch(events, host, apiKey, isVerbose, TrubricsIngestionEndpoints.EVENT, TrubricsEventTypes.EVENT);
+    }
+    if (!llmEventsSuccess) {
+        await retryBatch(llmEvents, host, apiKey, isVerbose, TrubricsIngestionEndpoints.LLM_EVENT, TrubricsEventTypes.LLM_EVENT);
+    }
+    
+    queue.splice(0, numberOfEventsToPublish);
 }
 
-const batchEvents = async (events: TrackRequest[], host: string, apiKey: string, isVerbose: boolean) => {
+const retryBatch = async (
+    events: (TrackRequest | TrackLLMRequest)[],
+    host: string,
+    apiKey: string,
+    isVerbose: boolean,
+    endpoint: TrubricsIngestionEndpoints,
+    eventType: TrubricsEventTypes
+) => {
+    await new Promise(resolve => setTimeout(resolve, 5000));
     if (isVerbose) {
-        console.info(`Posting ${events.length} events`);
+        console.info(`Retrying to post ${events.length} ${eventType}s`);
+    }
+    await batchEvents(events, host, apiKey, isVerbose, endpoint, eventType);
+}
+
+const batchEvents = async (
+    events: (TrackRequest | TrackLLMRequest)[],
+    host: string,
+    apiKey: string,
+    isVerbose: boolean,
+    endpoint: TrubricsIngestionEndpoints,
+    eventType: TrubricsEventTypes
+) => {
+    if (!events.length) {
+        return true;
+    }
+
+    if (isVerbose) {
+        console.info(`Posting ${events.length} ${eventType}s`);
     }
 
     try {
-        const url = new URL(host + "/publish_events");
+        const url = new URL(`${host}/${endpoint}`);
         const response = await fetch(url, {
             method: "POST",
             body: JSON.stringify(events),
@@ -76,7 +117,17 @@ const batchEvents = async (events: TrackRequest[], host: string, apiKey: string,
         });
         return validateResponse(response);
     } catch (error) {
-        console.error(`Trubrics was unable to post ${events.length} events.`, error);
+        console.error(`Trubrics was unable to post ${events.length} ${eventType}s.`, error);
         return false;
     }
+}
+
+export enum TrubricsEventTypes {
+    EVENT = "event",
+    LLM_EVENT = "llm_event"
+}
+
+export enum TrubricsIngestionEndpoints {
+    EVENT = "publish_events",
+    LLM_EVENT = "publish_llm_events"
 }
