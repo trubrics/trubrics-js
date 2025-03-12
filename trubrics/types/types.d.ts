@@ -8,11 +8,12 @@ export type TrackRequest = {
 export type TrackLLMRequest = {
     user_id: string,
     prompt: string,
-    assistant_id: string,
     generation: string,
+    assistant_id?: string,
     properties?: Record<string, any>,
     timestamp?: Date = new Date(),
     latency?: number
+    thread_id?: string
 }
 
 export type TrubricsInitialization = {

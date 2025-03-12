@@ -101,7 +101,7 @@ export class Trubrics {
 
         try {
             checkAuth(this.apiKey);
-            validateRequest([request.user_id, request.prompt, request.assistant_id, request.generation], [request.latency], [request.timestamp], [request.user_id, request.prompt, request.assistant_id, request.generation]);
+            validateRequest([request.user_id, request.prompt, request.assistant_id, request.generation, request.thread_id], [request.latency], [request.timestamp], [request.user_id, request.prompt, request.generation]);
             request.timestamp = request.timestamp ?? new Date();
 
             this.queue.push({
