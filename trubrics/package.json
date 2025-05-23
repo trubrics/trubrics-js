@@ -1,10 +1,11 @@
 {
   "name": "@trubrics/trubrics",
-  "version": "0.5.25",
+  "version": "0.5.28",
   "main": "dist/trubrics.js",
   "type": "module",
   "scripts": {
     "prepare": "npm run build",
+    "prebuild": "node scripts/update-version.js",
     "build": "tsc"
   },
   "keywords": [
