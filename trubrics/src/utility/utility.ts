@@ -1,5 +1,6 @@
 import { EventToPublish, TrackLLMRequest, TrackRequest } from "../../types/types.js";
 import { MAX_FLUSH_BATCH_SIZE } from "./config.js";
+import { SDK_VERSION } from "./version.js";
 
 export const validateResponse = (response: Response) => {
     if (!response.ok) {
@@ -120,6 +121,15 @@ const batchEvents = async (
         console.error(`Trubrics was unable to post ${events.length} ${eventType}s.`, error);
         return false;
     }
+}
+
+export const addSourceProperty = (properties?: Record<string, any>): Record<string, any> => {
+    if (properties) {
+        properties.source = `js_sdk_${SDK_VERSION}`;
+    } else {
+        properties = { source: `js_sdk_${SDK_VERSION}` };
+    }
+    return properties;
 }
 
 export enum TrubricsEventTypes {

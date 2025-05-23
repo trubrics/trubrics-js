@@ -1,5 +1,5 @@
 import { EventToPublish, TrackLLMRequest, TrackRequest, TrubricsInitialization } from '../types/types.js';
-import { flushQueue, checkAuth, validateRequest } from './utility/utility.js';
+import { flushQueue, checkAuth, validateRequest, addSourceProperty } from './utility/utility.js';
 import { DEFAULT_FLUSH_BATCH_SIZE, DEFAULT_FLUSH_INTERVAL, DEFAULT_FLUSH_PERIODIC_CHECK, MAX_FLUSH_BATCH_SIZE, MIN_FLUSH_INTERVAL, TrubricsEventTypes } from './utility/config.js';
 
 /**
@@ -80,6 +80,8 @@ export class Trubrics {
             validateRequest([request.event, request.user_id], [], [request.timestamp], [request.event, request.user_id]);
             request.timestamp = request.timestamp ?? new Date();
 
+            request.properties = addSourceProperty(request.properties);
+
             this.queue.push({
                 event: request,
                 eventType: TrubricsEventTypes.EVENT
@@ -103,6 +105,8 @@ export class Trubrics {
             checkAuth(this.apiKey);
             validateRequest([request.user_id, request.prompt, request.assistant_id, request.generation, request.thread_id], [request.latency], [request.timestamp], [request.user_id, request.prompt, request.generation]);
             request.timestamp = request.timestamp ?? new Date();
+
+            request.properties = addSourceProperty(request.properties);
 
             this.queue.push({
                 event: request,
